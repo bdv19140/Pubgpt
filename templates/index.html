@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Assistant IA sponsorisé</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; padding: 2em; }
+        .produit { margin-top: 1em; padding: 1em; border: 1px solid #ccc; }
+        .produit img { max-width: 100px; }
+    </style>
+</head>
+<body>
+    <h1>Pose ta question</h1>
+    <form method="post">
+        <input type="text" name="question" placeholder="Ta question ici..." style="width:100%; padding: 0.5em;" required>
+        <button type="submit" style="margin-top: 1em;">Envoyer</button>
+    </form>
+
+    {% if reponse %}
+        <h2>Réponse :</h2>
+        <p>{{ reponse }}</p>
+
+        {% if produit %}
+        <div class="produit">
+            <p><strong>Suggestion sponsorisée :</strong></p>
+            <p>{{ produit.titre }}</p>
+            <a href="{{ produit.lien }}" target="_blank">
+                <img src="{{ produit.image }}" alt="Produit sponsorisé">
+            </a>
+        </div>
+        {% endif %}
+    {% endif %}
+</body>
+</html>
