@@ -6,12 +6,13 @@ import xmltodict
 import hashlib
 import hmac
 import time
+import os
 
-# Clés API
-OPENAI_API_KEY = 'TA_CLE_OPENAI'
-ACCESS_KEY = 'TA_CLE_AMAZON'
-SECRET_KEY = 'TA_CLE_SECRETE_AMAZON'
-ASSOCIATE_TAG = 'TON_TAG_ASSOCIE_AMAZON'
+# Clés API (à configurer via Render)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+ACCESS_KEY = os.environ.get("ACCESS_KEY")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+ASSOCIATE_TAG = os.environ.get("ASSOCIATE_TAG")
 
 openai.api_key = OPENAI_API_KEY
 ENDPOINT = "webservices.amazon.com"
@@ -101,10 +102,6 @@ def index():
             reponse = "Je n'ai pas trouvé de produit sponsorisé pertinent, mais voici ma réponse :"
         return render_template('index.html', question=question, reponse=reponse, produit=produit)
     return render_template('index.html')
-
-if __name__ == '__main__':
-    app.run(debug=True)
-import os
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
