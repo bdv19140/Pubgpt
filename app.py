@@ -1,30 +1,41 @@
 
 from flask import Flask, render_template, request
 import openai
-import requests
-import xmltodict
-import hashlib
-import hmac
-import time
 import os
 
-# Clés API (à configurer via Render)
+# ClÃ©s API (uniquement OpenAI dans cette version)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-ACCESS_KEY = os.environ.get("ACCESS_KEY")
-SECRET_KEY = os.environ.get("SECRET_KEY")
-ASSOCIATE_TAG = os.environ.get("ASSOCIATE_TAG")
-
 openai.api_key = OPENAI_API_KEY
-ENDPOINT = "webservices.amazon.com"
-URI = "/onca/xml"
 
 app = Flask(__name__)
 
+# Produits sponsorisÃ©s fictifs
+produits_test = [
+    {
+        "keywords": ["sommeil", "stress", "dormir"],
+        "titre": "Tisane Bio RelaxZen",
+        "lien": "https://exemple.com/produit/tisane-relaxzen",
+        "image": "https://via.placeholder.com/100?text=RelaxZen"
+    },
+    {
+        "keywords": ["concentration", "travail", "focus"],
+        "titre": "ComplÃ©ment FocusPro",
+        "lien": "https://exemple.com/produit/focuspro",
+        "image": "https://via.placeholder.com/100?text=FocusPro"
+    },
+    {
+        "keywords": ["digestion", "ventre", "repas"],
+        "titre": "Infusion DigestZen",
+        "lien": "https://exemple.com/produit/digestzen",
+        "image": "https://via.placeholder.com/100?text=DigestZen"
+    }
+]
+
 def extraire_mots_cles_gpt(question):
     prompt = (
-        "Tu es un extracteur de mots-clés. "
+        "Tu es un extracteur de mots-clÃ©s. "
         f"Voici une question d'utilisateur : \"{question}\"\n"
-        "Donne-moi 2 ou 3 mots-clés les plus importants, séparés par des virgules, sans phrase autour."
+        "Donne-moi 2 ou 3 mots-clÃ©s les plus importants, sÃ©parÃ©s par des virgules, sans phrase autour."
     )
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -32,51 +43,18 @@ def extraire_mots_cles_gpt(question):
         temperature=0.2,
     )
     mots_cles = response['choices'][0]['message']['content']
-    return [mot.strip() for mot in mots_cles.split(',')]
+    return [mot.strip().lower() for mot in mots_cles.split(',')]
 
-def sign_request(params):
-    params['Timestamp'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    sorted_params = sorted(params.items())
-    query_string = '&'.join([f"{k}={requests.utils.quote(str(v))}" for k, v in sorted_params])
-    string_to_sign = f"GET\n{ENDPOINT}\n{URI}\n{query_string}"
-    signature = hmac.new(bytes(SECRET_KEY, 'utf-8'), msg=bytes(string_to_sign, 'utf-8'), digestmod='sha256').digest()
-    signature = requests.utils.quote(signature)
-    return f"https://{ENDPOINT}{URI}?{query_string}&Signature={signature}"
-
-def chercher_produit_amazon(mot_cle):
-    params = {
-        'Service': 'AWSECommerceService',
-        'Operation': 'ItemSearch',
-        'SearchIndex': 'All',
-        'Keywords': mot_cle,
-        'ResponseGroup': 'Images,ItemAttributes,Offers',
-        'AssociateTag': ASSOCIATE_TAG,
-        'AWSAccessKeyId': ACCESS_KEY
-    }
-    signed_url = sign_request(params)
-    response = requests.get(signed_url)
-    if response.status_code != 200:
-        return None
-
-    data = xmltodict.parse(response.text)
-    items = data.get('ItemSearchResponse', {}).get('Items', {}).get('Item', [])
-    if not isinstance(items, list): items = [items]
-
-    for item in items:
-        try:
-            return {
-                'titre': item.get('ItemAttributes', {}).get('Title', ''),
-                'lien': item.get('DetailPageURL', ''),
-                'image': item.get('MediumImage', {}).get('URL', '')
-            }
-        except:
-            continue
-    return None
+def trouver_produit_correspondant(mots_cles):
+    for produit in produits_test:
+        if any(mot in produit["keywords"] for mot in mots_cles):
+            return produit
+    return produits_test[0]  # fallback si rien ne matche
 
 def generer_reponse_finale(question, produit):
     contexte_pub = (
-        f"Si pertinent, insère subtilement cette recommandation dans ta réponse : "
-        f"\"{produit['titre']} est un produit utile dans ce contexte. Tu peux le découvrir ici : {produit['lien']}\""
+        f"Si pertinent, insÃ¨re subtilement cette recommandation dans ta rÃ©ponse : "
+        f"\"{produit['titre']} est un produit utile dans ce contexte. Tu peux le dÃ©couvrir ici : {produit['lien']}\""
     )
     prompt = f"{contexte_pub}\n\nVoici la question utilisateur : {question}"
     response = openai.ChatCompletion.create(
@@ -91,15 +69,8 @@ def index():
     if request.method == 'POST':
         question = request.form['question']
         mots_cles = extraire_mots_cles_gpt(question)
-        produit = None
-        for mot in mots_cles:
-            produit = chercher_produit_amazon(mot)
-            if produit:
-                break
-        if produit:
-            reponse = generer_reponse_finale(question, produit)
-        else:
-            reponse = "Je n'ai pas trouvé de produit sponsorisé pertinent, mais voici ma réponse :"
+        produit = trouver_produit_correspondant(mots_cles)
+        reponse = generer_reponse_finale(question, produit)
         return render_template('index.html', question=question, reponse=reponse, produit=produit)
     return render_template('index.html')
 
